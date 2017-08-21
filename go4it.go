@@ -33,18 +33,14 @@ func NewResource(url, path string) *Resource {
 
 //InitDownloader gorotine
 func InitDownloader(jobs chan *Resource, wg *sync.WaitGroup) {
-	// go func() {
 	for res := range jobs {
-		go func() {
-			if res.isNeeded() {
-				res.download()
+		go func(r *Resource) {
+			if r.isNeeded() {
+				r.download()
 			}
 			wg.Done()
-		}()
-		// wg.Done()
+		}(res)
 	}
-	// wg.Done()
-	// }()
 }
 
 //isNeeded
