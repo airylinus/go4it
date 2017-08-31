@@ -3,6 +3,7 @@ package go4it
 /*--------------------------------*/
 
 import (
+	"errors"
 	"io/ioutil"
 	"math/rand"
 	"net/http"
@@ -66,17 +67,18 @@ func (res *Resource) download() bool {
 	return true
 }
 
+//@TODO add header fields
 //remoteFetch
 func remoteFetch(res *Resource) ([]byte, error) {
 	response, err := http.Get(res.URL)
 	if err != nil {
-		// handle error
+		return nil, errors.New("failed to fetch images")
 	}
 
 	defer response.Body.Close()
 	body, err := ioutil.ReadAll(response.Body)
 	if err != nil {
-		// handle error
+		return nil, errors.New("failed to read response body")
 	}
 	return body, nil
 }
