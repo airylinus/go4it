@@ -1,0 +1,8 @@
+package: github.com/airylinus/go4it
+homepage: https://github.com/airylinus/go4it
+license: DWTFYW
+owners:
+- name: MongoHsiung
+  email: airy@live.com
+  homepage: https://github.com/airylinus
+import: []
