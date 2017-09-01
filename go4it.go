@@ -4,7 +4,7 @@ package go4it
 
 import (
 	"errors"
-	"io/ioutil"
+	"io"
 	"math/rand"
 	"net/http"
 	"os"
@@ -13,11 +13,13 @@ import (
 	"time"
 )
 
-//ChanJobs store Entity string
-var ChanJobs = make(chan *Resource, 20)
-
 //SupportTypes defines all Image types download supported
-var SupportTypes = []string{"jpg", "jpeg"}
+var (
+	SupportTypes = []string{"jpg", "jpeg"}
+	timeout      = 7 * time.Second
+	chanJobs     chan *Resource
+	defaultJobs  = 20
+)
 
 //Resource is a wrape
 type Resource struct {
@@ -32,11 +34,25 @@ func NewResource(url, path string) *Resource {
 	return &e
 }
 
-//InitDownloader gorotine
-func InitDownloader(jobs chan *Resource, wg *sync.WaitGroup) {
-	for res := range jobs {
+//Get add resource to download queue
+func Get(r *Resource) {
+	chanJobs <- r
+}
+
+func init() {
+	InitJobChan(defaultJobs)
+}
+
+//InitJobChan init job queue
+func InitJobChan(batchSize int) {
+	chanJobs = make(chan *Resource, batchSize)
+}
+
+//InitDownloader goroutine
+func InitDownloader(wg *sync.WaitGroup) {
+	for res := range chanJobs {
 		go func(r *Resource) {
-			if r.isNeeded() {
+			if r.IsNeeded() {
 				r.download()
 			}
 			wg.Done()
@@ -44,8 +60,8 @@ func InitDownloader(jobs chan *Resource, wg *sync.WaitGroup) {
 	}
 }
 
-//isNeeded
-func (res *Resource) isNeeded() bool {
+//IsNeeded is
+func (res *Resource) IsNeeded() bool {
 	u := strings.Split(res.URL, ".")
 	ext := u[len(u)-1]
 	for _, v := range SupportTypes {
@@ -57,35 +73,44 @@ func (res *Resource) isNeeded() bool {
 	return false
 }
 
-func (res *Resource) download() bool {
-	data, err := remoteFetch(res)
-	checkError(err)
-	if data != nil {
-		e := ioutil.WriteFile(res.Path, data, os.ModePerm)
-		checkError(e)
-	}
-	return true
-}
+//download resource via URI
+func (res *Resource) download() (int64, error) {
 
-//@TODO add header fields
-//remoteFetch
-func remoteFetch(res *Resource) ([]byte, error) {
-	response, err := http.Get(res.URL)
+	t := time.Duration(timeout)
+	client := http.Client{Timeout: t}
+	request, err := http.NewRequest("GET", res.URL, nil)
 	if err != nil {
-		return nil, errors.New("failed to fetch images")
+		return 0, errors.New("error format of URL " + err.Error())
 	}
-
-	defer response.Body.Close()
-	body, err := ioutil.ReadAll(response.Body)
+	request.Header.Add("user-agent", GetRandomUserAgent())
+	response, err := client.Do(request)
 	if err != nil {
-		return nil, errors.New("failed to read response body")
+		return 0, errors.New("failed to fetch images" + err.Error())
 	}
-	return body, nil
+	length := response.ContentLength
+	if length < 200 {
+		return 0, errors.New("")
+	}
+	//panic(respHeader)
+	f, err := os.Create(res.Path)
+	if err != nil {
+		//checkError(err)
+		return 0, errors.New("failed create file : " + res.Path)
+	}
+	l, err := io.Copy(f, response.Body)
+	if err != nil {
+		//checkError(err)
+		return 0, errors.New("failed copy from response body : " + err.Error())
+	}
+	if l < length {
+		panic(response.Header)
+	}
+	return l, nil
 }
 
 func checkError(e error) {
 	if e != nil {
-		return
+		panic(e)
 	}
 }
 
