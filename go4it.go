@@ -28,6 +28,11 @@ type Resource struct {
 	Path string
 }
 
+// Hello 返回一句话
+func Hello() string {
+	return "我思故我在"
+}
+
 //NewResource init an Entity
 func NewResource(url, path string) *Resource {
 	e := Resource{URL: url, Path: path}
